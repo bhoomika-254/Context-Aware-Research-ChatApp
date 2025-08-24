@@ -75,7 +75,7 @@ case "${START_MODE:-both}" in\n\
         ;;\n\
     "frontend")\n\
         echo "Starting in frontend-only mode..."\n\
-        streamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true\n\
+        streamlit run streamlit_app.py --server.port 7860 --server.address 0.0.0.0 --server.headless true\n\
         ;;\n\
     "both"|*)\n\
         echo "Starting in full-stack mode..."\n\
@@ -102,7 +102,7 @@ case "${START_MODE:-both}" in\n\
 esac' > /app/start.sh && chmod +x /app/start.sh
 
 # Expose ports for both services
-EXPOSE 8000 8501
+EXPOSE 7860 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
