@@ -12,41 +12,65 @@ import time
 import threading
 import os
 import atexit
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+API_URL = "http://localhost:8000/brief"
+BACKEND_PROCESS = None
 
-# Configuration - Use environment variable for backend URL
-API_URL = os.getenv("API_URL", "http://localhost:8000")
-BRIEF_ENDPOINT = f"{API_URL}/brief"
-HEALTH_ENDPOINT = f"{API_URL}/health"
-
-def check_backend_connection():
-    """Check if backend is accessible."""
-    try:
-        response = requests.get(HEALTH_ENDPOINT, timeout=5)
-        return response.status_code == 200
-    except requests.exceptions.RequestException:
-        return False
-
-def make_api_request(endpoint, data):
-    """Make API request with proper headers for CORS."""
-    headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-    }
+def start_backend_if_needed():
+    """Start the FastAPI backend if it's not already running."""
+    global BACKEND_PROCESS
     
+    # Check if backend is already running
     try:
-        response = requests.post(endpoint, json=data, headers=headers, timeout=300)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        st.error(f"API request failed: {str(e)}")
-        return None
+        response = requests.get("http://localhost:8000/health", timeout=2)
+        if response.status_code == 200:
+            return True
+    except:
+        pass
+    
+    # Start backend if not running
+    if BACKEND_PROCESS is None:
+        try:
+            BACKEND_PROCESS = subprocess.Popen([
+                sys.executable, "-m", "uvicorn", 
+                "app.main:app",
+                "--host", "0.0.0.0",
+                "--port", "8000"
+            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            # Wait for backend to start
+            for _ in range(30):  # Wait up to 30 seconds
+                try:
+                    response = requests.get("http://localhost:8000/health", timeout=1)
+                    if response.status_code == 200:
+                        st.success("✅ Backend server started successfully!")
+                        return True
+                except:
+                    time.sleep(1)
+            
+            st.error("❌ Backend server failed to start")
+            return False
+        except Exception as e:
+            st.error(f"❌ Error starting backend: {e}")
+            return False
+    
+    return True
 
-# Check backend connection
-backend_connected = check_backend_connection()
+def cleanup_backend():
+    """Clean up backend process on exit."""
+    global BACKEND_PROCESS
+    if BACKEND_PROCESS:
+        BACKEND_PROCESS.terminate()
+        BACKEND_PROCESS = None
+
+# Register cleanup function
+atexit.register(cleanup_backend)
+
+# Start backend when app loads
+if 'backend_started' not in st.session_state:
+    with st.spinner("🚀 Starting backend server..."):
+        st.session_state.backend_started = start_backend_if_needed()
+
 # Configure page
 st.set_page_config(
     page_title="Research Assistant", 
@@ -54,21 +78,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
-
-# Backend connection status
-if backend_connected:
-    st.success(f"✅ Connected to backend: {API_URL}")
-else:
-    st.error(f"❌ Cannot connect to backend: {API_URL}")
-    with st.sidebar:
-        st.subheader("⚙️ Backend Configuration")
-        custom_url = st.text_input("Backend URL", value=API_URL, key="backend_url")
-        if st.button("🔄 Test Connection"):
-            # Update API URLs
-            API_URL = custom_url
-            BRIEF_ENDPOINT = f"{API_URL}/brief"
-            HEALTH_ENDPOINT = f"{API_URL}/health"
-            st.rerun()
 
 # Initialize session state
 if "messages" not in st.session_state:
@@ -502,10 +511,10 @@ if prompt:
             }
             
             # Make API request
-            response_data = make_api_request(BRIEF_ENDPOINT, payload)
+            response = requests.post(API_URL, json=payload, timeout=300)
             
-            if response_data:
-                brief_data = response_data.get("final_brief", response_data)
+            if response.status_code == 200:
+                brief_data = response.json()
                 
                 # Create assistant response
                 follow_up_text = " (Follow-up detected)" if is_follow_up else ""
@@ -542,7 +551,7 @@ if prompt:
                 display_research_brief(brief_data)
                 
             else:
-                error_message = "I apologize, but I encountered an error while researching your query. Please try again."
+                error_message = f"I apologize, but I encountered an error while researching your query. (Error {response.status_code})"
                 st.session_state.messages.append({"role": "assistant", "content": error_message})
                 st.error(error_message)
                 

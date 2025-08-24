@@ -1,7 +1,6 @@
 """Main application entry point."""
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 
 # This will be implemented in Phase 5
@@ -14,19 +13,8 @@ app = FastAPI(
     description="Context-aware research brief generator using LangGraph and LangChain",
     debug=settings.debug
 )
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "*"                               # Development wildcard (remove in production)
-    ],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-)
-
 app.include_router(briefs_router)
+
 
 @app.get("/")
 async def root():
@@ -36,6 +24,7 @@ async def root():
         "version": settings.app_version,
         "status": "operational"
     }
+
 
 @app.get("/health")
 async def health_check():
