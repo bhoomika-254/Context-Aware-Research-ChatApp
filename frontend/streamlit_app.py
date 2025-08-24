@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configuration - Use environment variable for backend URL
-API_URL = os.getenv("API_URL", "http://localhost:8000")
+API_URL = os.getenv("API_URL", "https://huggingface.co/spaces/bhoomika19/context-aware-research-bott")
 BRIEF_ENDPOINT = f"{API_URL}/brief"
 HEALTH_ENDPOINT = f"{API_URL}/health"
 
